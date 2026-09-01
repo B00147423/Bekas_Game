@@ -25,6 +25,8 @@ add_executable(BEKAS_GAME
     src/Lighting/OcclusionBuffer.cpp
     src/Lighting/ShadowBuffer.cpp
     src/World/FlowField.cpp
+    src/Physics/Physicsworld.cpp
+    src/Game/Camera.cpp
 )
 
 target_include_directories(BEKAS_GAME PRIVATE
