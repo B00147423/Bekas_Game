@@ -30,7 +30,9 @@ namespace Animation{
             int framesPerRow,
             int step,
             float frameDuration,
-            AnimationType type
+            AnimationType type,
+            int frameWidth,
+            int frameHeight
         );
 
   
@@ -50,8 +52,9 @@ namespace Animation{
         int step;
         float frameDuration;
         float timeRemaining;
-
-        Direction direction = Direction::Right;
+        int frameWidth;
+        int frameHeight;
+        Direction direction = Direction::Down;
 
         
         AnimationType type;

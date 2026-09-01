@@ -4,7 +4,17 @@ namespace Animation
 {
 
 
-    Animation::Animation::Animation(int firstFrame, int lastFrame, int framesPerRow, int step, float frameDuration, AnimationType type){
+    Animation::Animation::Animation(
+        int firstFrame,
+        int lastFrame,
+        int framesPerRow,
+        int step,
+        float frameDuration,
+        AnimationType type,
+        int frameWidth,
+        int frameHeight
+    )
+    {
         this->firstFrame = firstFrame;
         this->lastFrame = lastFrame;
         this->currentFrame = firstFrame;
@@ -13,6 +23,8 @@ namespace Animation
         this->frameDuration = frameDuration;
         this->timeRemaining = frameDuration;
         this->type = type;
+        this->frameWidth = frameWidth;
+        this->frameHeight = frameHeight;
     }
 
     void Animation::updateAnimation(){
@@ -50,24 +62,30 @@ namespace Animation
             currentFrame == lastFrame;
     }
 
-    Rectangle Animation::GetFrame() const{
-        int x = (currentFrame % framesPerRow) * 96;
-        int y = (currentFrame / framesPerRow) * 96;
+    Rectangle Animation::Animation::GetFrame() const
+    {
+        int row = 0;
 
-        if(direction == Direction::Left){
-            return Rectangle{
-                static_cast<float>(x),
-                static_cast<float>(y),
-                -96.0f,
-                96.0f
-            };
+        switch (direction)
+        {
+            case Direction::Down:      row = 0; break;
+            case Direction::DownRight: row = 1; break;
+            case Direction::Right:     row = 2; break;
+            case Direction::UpRight:   row = 3; break;
+            case Direction::Up:        row = 4; break;
+            case Direction::UpLeft:    row = 5; break;
+            case Direction::Left:      row = 6; break;
+            case Direction::DownLeft:  row = 7; break;
         }
 
-        return Rectangle{
+        int x = currentFrame * frameWidth;
+        int y = row * frameHeight;
+
+        return {
             static_cast<float>(x),
             static_cast<float>(y),
-            96.0f,
-            96.0f
+            static_cast<float>(frameWidth),
+            static_cast<float>(frameHeight)
         };
     }
 
