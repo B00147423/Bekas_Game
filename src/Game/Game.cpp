@@ -4,18 +4,52 @@ namespace Game
 {
     namespace
     {
-        constexpr float kPlayerSpriteSize = 96.0f;
+        constexpr float kPlayerSpriteSize = 48.0f;
         // Physics body sits near the sprite feet (draw uses top-left)
         constexpr float kPlayerBodyOffsetX = kPlayerSpriteSize * 0.5f;
-        constexpr float kPlayerBodyOffsetY = kPlayerSpriteSize * 0.75f;
-    }
+        constexpr float kPlayerBodyOffsetY = kPlayerSpriteSize * 0.65f;
 
+        static constexpr Vector2 kPlayerSpawnPosition = { 500.0f, 300.0f };
+        static constexpr Vector2 kPlayerColliderSize = { 10.0f, 10.0f };
+
+        constexpr int kCharacterFrameWidth = 32;
+        constexpr int kCharacterFrameHeight = 32;
+        constexpr int kCharacterFramesPerRow = 29;
+
+        constexpr int kIdleFirstFrame = 0;
+        constexpr int kIdleLastFrame = 1;
+        constexpr float kIdleFrameDuration = 0.15f;
+
+        constexpr int kWalkFirstFrame = 2;
+        constexpr int kWalkLastFrame = 4;
+        constexpr float kWalkFrameDuration = 0.10f;
+    }
     Game::Game()
-        : m_world(std::random_device{}()),
-          m_idleAnimation(0, 9, 10, 1, 0.10f, Animation::Animation::AnimationType::REPEATING),
-          m_runAnimation(0, 15, 16, 1, 0.04f, Animation::Animation::AnimationType::REPEATING)
+        : m_physicsWorld(),
+        m_world(std::random_device{}(), m_physicsWorld),
+        m_idleAnimation(
+        kIdleFirstFrame,
+        kIdleLastFrame,
+        kCharacterFramesPerRow,
+        1,
+        kIdleFrameDuration,
+        Animation::Animation::AnimationType::REPEATING,
+        kCharacterFrameWidth,
+        kCharacterFrameHeight
+    ),
+    
+    m_runAnimation(
+        kWalkFirstFrame,
+        kWalkLastFrame,
+        kCharacterFramesPerRow,
+        1,
+        kWalkFrameDuration,
+        Animation::Animation::AnimationType::REPEATING,
+        kCharacterFrameWidth,
+        kCharacterFrameHeight
+    )
     {
-        m_position = { 500.0f, 300.0f };
+        m_position = kPlayerSpawnPosition;
 
         Vector2 spawnPosition = {
             m_position.x + kPlayerBodyOffsetX,
@@ -23,9 +57,15 @@ namespace Game
         };
 
         m_world.Generate(spawnPosition);
-        m_idleTexture = LoadTexture("assets/IDLE.png");
-        m_runTexture = LoadTexture("assets/RUN.png");
-        m_tileset.Load("assets/grass_top_layer.png", "assets/Trees_Flowers.png");
+        m_camera.SetTarget(spawnPosition);
+
+        m_idleTexture = LoadTexture("assets/human.png");
+        m_runTexture = LoadTexture("assets/human.png");
+        m_tileset.Load(
+            "assets/grass_top_layer.png",
+            "assets/Trees_Flowers.png",
+            "assets/47Tiles_grass.png"
+        );
 
         m_gbuffer.Init(GetScreenWidth(), GetScreenHeight());
         m_occlusionBuffer.Init(GetScreenWidth(), GetScreenHeight());
@@ -47,11 +87,9 @@ namespace Game
         if (!IsShaderValid(m_blurShader))
             TraceLog(LOG_WARNING, "Failed to load blur.fs");
 
-        m_blurLocResolution =
-            GetShaderLocation(m_blurShader, "resolution");
+        m_blurLocResolution = GetShaderLocation(m_blurShader, "resolution");
 
-        m_blurLocDirection =
-            GetShaderLocation(m_blurShader, "direction");
+        m_blurLocDirection = GetShaderLocation(m_blurShader, "direction");
         m_shadowLocOcclusionTexture =GetShaderLocation(m_shadowShader, "occlusionTexture");
         m_shadowLocLightPos = GetShaderLocation(m_shadowShader, "lightPos");
         m_shadowLocResolution = GetShaderLocation(m_shadowShader, "resolution");
@@ -98,55 +136,34 @@ namespace Game
 
     void Game::CreatePlayerBody()
     {
-        constexpr float ppm = World::World::PixelsPerMeter;
-
-        b2BodyDef bodyDef = b2DefaultBodyDef();
-        bodyDef.type = b2_dynamicBody;
-        bodyDef.position = {
-            (m_position.x + kPlayerBodyOffsetX) / ppm,
-            (m_position.y + kPlayerBodyOffsetY) / ppm
-        };
-        bodyDef.motionLocks.angularZ = true;
-        bodyDef.linearDamping = 0.0f;
-
-        m_playerBody = b2CreateBody(m_world.GetPhysicsWorld(), &bodyDef);
-
-        const b2Polygon shape = b2MakeBox(
-            10.0f / ppm,
-            10.0f / ppm
-        );
-
-        b2ShapeDef shapeDef = b2DefaultShapeDef();
-        shapeDef.density = 1.0f;
-        b2CreatePolygonShape(m_playerBody, &shapeDef, &shape);
-        b2Body_ApplyMassFromShapes(m_playerBody);
-    }
-
-    void Game::SyncPlayerFromPhysics()
-    {
-        constexpr float ppm = World::World::PixelsPerMeter;
-        const b2Vec2 pos = b2Body_GetPosition(m_playerBody);
-        m_position.x = static_cast<float>(pos.x) * ppm - kPlayerBodyOffsetX;
-        m_position.y = static_cast<float>(pos.y) * ppm - kPlayerBodyOffsetY;
-    }
-
-    void Game::PlayerInput()
-    {
-        constexpr float ppm = World::World::PixelsPerMeter;
-        const float speedMeters = m_playerSpeed / ppm;
-
         Vector2 playerFeet = {
             m_position.x + kPlayerBodyOffsetX,
             m_position.y + kPlayerBodyOffsetY
         };
 
-        Vector2 direction =
-            m_world.GetFlowDirection(playerFeet);
 
-        b2Vec2 velocity = {
-            direction.x * speedMeters,
-            direction.y * speedMeters
+        m_playerBody = m_physicsWorld.CreateDynamicBox(
+            playerFeet,
+            kPlayerColliderSize
+        );
+    }
+
+    void Game::SyncPlayerFromPhysics()
+    {
+        Vector2 pos = m_physicsWorld.GetBodyPosition(m_playerBody);
+
+        m_position.x = pos.x - kPlayerBodyOffsetX;
+        m_position.y = pos.y - kPlayerBodyOffsetY;
+    }
+
+    void Game::PlayerInput()
+    {
+        Vector2 playerFeet = {
+            m_position.x + kPlayerBodyOffsetX,
+            m_position.y + kPlayerBodyOffsetY
         };
+
+        Vector2 direction = m_world.GetFlowDirection(playerFeet);
 
         m_playerMoving =
             direction.x != 0.0f ||
@@ -154,7 +171,15 @@ namespace Game
 
         if (m_playerMoving)
         {
-            if (direction.x < 0.0f)
+            if (direction.x < 0.0f && direction.y < 0.0f)
+                m_runAnimation.SetDirection(Animation::Animation::Direction::UpLeft);
+            else if (direction.x > 0.0f && direction.y < 0.0f)
+                m_runAnimation.SetDirection(Animation::Animation::Direction::UpRight);
+            else if (direction.x < 0.0f && direction.y > 0.0f)
+                m_runAnimation.SetDirection(Animation::Animation::Direction::DownLeft);
+            else if (direction.x > 0.0f && direction.y > 0.0f)
+                m_runAnimation.SetDirection(Animation::Animation::Direction::DownRight);
+            else if (direction.x < 0.0f)
                 m_runAnimation.SetDirection(Animation::Animation::Direction::Left);
             else if (direction.x > 0.0f)
                 m_runAnimation.SetDirection(Animation::Animation::Direction::Right);
@@ -163,6 +188,8 @@ namespace Game
             else if (direction.y > 0.0f)
                 m_runAnimation.SetDirection(Animation::Animation::Direction::Down);
 
+            // Keep idle facing the same way for when movement stops
+            m_idleAnimation.SetDirection(m_runAnimation.GetDirection());
             m_runAnimation.updateAnimation();
         }
         else
@@ -170,22 +197,74 @@ namespace Game
             m_idleAnimation.updateAnimation();
         }
 
-        b2Body_SetLinearVelocity(
-            m_playerBody,
-            velocity
-        );
+        Vector2 velocity = {
+            direction.x * m_playerSpeed,
+            direction.y * m_playerSpeed
+        };
 
-        m_world.Step(GetFrameTime());
+        const Vector2 before = playerFeet;
 
+        m_physicsWorld.SetVelocity(m_playerBody, velocity);
+        m_physicsWorld.Step(GetFrameTime());
         SyncPlayerFromPhysics();
+
+        // If flow wants to move but physics barely moved, slide around the blocker
+        if (m_playerMoving)
+        {
+            const Vector2 after = {
+                m_position.x + kPlayerBodyOffsetX,
+                m_position.y + kPlayerBodyOffsetY
+            };
+            const float dx = after.x - before.x;
+            const float dy = after.y - before.y;
+            const float movedSq = dx * dx + dy * dy;
+
+            if (movedSq < 0.25f)
+            {
+                const Vector2 slide = m_world.GetSlideDirection(before, direction);
+                if (slide.x != 0.0f || slide.y != 0.0f)
+                {
+                    m_physicsWorld.SetVelocity(
+                        m_playerBody,
+                        {
+                            slide.x * m_playerSpeed,
+                            slide.y * m_playerSpeed
+                        }
+                    );
+                    m_physicsWorld.Step(GetFrameTime());
+                    SyncPlayerFromPhysics();
+                }
+            }
+        }
     }
+
+    Vector2 Game::GetLightWorldPosition() const
+    {
+        return {
+            m_position.x + kPlayerBodyOffsetX,
+            m_position.y + kPlayerBodyOffsetY
+        };
+    }
+
     void Game::Update()
     {
+        m_camera.Update();
+
+        if (IsKeyPressed(KEY_F1))
+            m_showColliders = !m_showColliders;
+
+        if (IsKeyPressed(KEY_F2))
+            m_showFlowField = !m_showFlowField;
+
+        if (IsKeyPressed(KEY_F3))
+             m_fullBright = !m_fullBright;
+
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
         {
-            m_world.SetFlowFieldTarget(
-                GetMousePosition()
-            );
+            Vector2 mouseWorld =
+                m_camera.ScreenToWorld(GetMousePosition());
+
+            m_world.SetFlowFieldTarget(mouseWorld);
         }
 
         PlayerInput();
@@ -297,10 +376,9 @@ namespace Game
     {
         const Texture2D mask = m_occlusionBuffer.GetTexture();
 
-        Vector2 lightPos = {
-            m_position.x + kPlayerBodyOffsetX,
-            m_position.y + kPlayerBodyOffsetY
-        };
+        // Shaders work in screen space; keep m_lightRadius as world units.
+        const Vector2 lightPos = m_camera.WorldToScreen(GetLightWorldPosition());
+        const float screenLightRadius = m_camera.WorldLengthToScreen(m_lightRadius);
 
         Vector2 resolution = {
             static_cast<float>(GetScreenWidth()),
@@ -309,7 +387,7 @@ namespace Game
 
         SetShaderValue(m_shadowShader, m_shadowLocLightPos, &lightPos, SHADER_UNIFORM_VEC2);
         SetShaderValue(m_shadowShader, m_shadowLocResolution, &resolution, SHADER_UNIFORM_VEC2);
-        SetShaderValue(m_shadowShader, m_shadowLocLightRadius, &m_lightRadius, SHADER_UNIFORM_FLOAT);
+        SetShaderValue(m_shadowShader, m_shadowLocLightRadius, &screenLightRadius, SHADER_UNIFORM_FLOAT);
 
         m_shadowBuffer.Begin();
 
@@ -342,15 +420,18 @@ namespace Game
 
     void Game::RenderOcclusion(){
         m_occlusionBuffer.Begin();
-
+        m_camera.Begin();
         // WE WILL DRAW TREE BLOCKERS WHITE HERE
         m_world.DrawOccluders();
+        m_camera.End();
         m_occlusionBuffer.End();
     }
 
     void Game::RenderScene(){
         m_gbuffer.Begin();
+        m_camera.Begin();
         DrawWorld();
+        m_camera.End();
         m_gbuffer.End();
     }
 
@@ -360,10 +441,27 @@ namespace Game
         const Texture2D normal = m_gbuffer.GetNormalTexture();
         const Texture2D blurredShadow = m_blurBufferB.GetTexture();
 
-        Vector2 lightPos = {
-            m_position.x + kPlayerBodyOffsetX,
-            m_position.y + kPlayerBodyOffsetY
-        };
+
+        if (m_fullBright)
+        {
+            DrawTextureRec(
+                albedo,
+                {
+                    0.0f,
+                    0.0f,
+                    static_cast<float>(albedo.width),
+                    -static_cast<float>(albedo.height)
+                },
+                { 0.0f, 0.0f },
+                WHITE
+            );
+
+            return;
+        }
+
+        const Vector2 lightPos = m_camera.WorldToScreen(GetLightWorldPosition());
+        const float screenLightRadius = m_camera.WorldLengthToScreen(m_lightRadius);
+
 
         Vector2 resolution = {
             static_cast<float>(albedo.width),
@@ -375,7 +473,7 @@ namespace Game
         );
 
         SetShaderValue(m_lightingShader, m_locResolution, &resolution, SHADER_UNIFORM_VEC2);
-        SetShaderValue( m_lightingShader, m_locLightRadius, &m_lightRadius, SHADER_UNIFORM_FLOAT);
+        SetShaderValue( m_lightingShader, m_locLightRadius, &screenLightRadius, SHADER_UNIFORM_FLOAT);
         SetShaderValue( m_lightingShader, m_locLightColor, &m_lightColor,SHADER_UNIFORM_VEC3);
         SetShaderValue(m_lightingShader, m_locLightIntensity, &m_lightIntensity, SHADER_UNIFORM_FLOAT
         );
@@ -401,6 +499,8 @@ namespace Game
                 blurredShadow
             );
         }
+
+
 
         int useScreenPosition = 0;
 
@@ -429,10 +529,19 @@ namespace Game
 
     void Game::DrawLitTrees(float playerFeetY, bool behindPlayer)
     {
-        Vector2 lightPos = {
-            m_position.x + kPlayerBodyOffsetX,
-            m_position.y + kPlayerBodyOffsetY
-        };
+
+        if (m_fullBright)
+        {
+            m_world.DrawTrees(
+                m_tileset,
+                playerFeetY,
+                behindPlayer
+            );
+
+            return;
+        }
+        const Vector2 lightPos = m_camera.WorldToScreen(GetLightWorldPosition());
+        const float screenLightRadius = m_camera.WorldLengthToScreen(m_lightRadius);
 
         Vector2 resolution = {
             static_cast<float>(GetScreenWidth()),
@@ -445,7 +554,7 @@ namespace Game
 
         SetShaderValue(m_lightingShader,m_locResolution, &resolution, SHADER_UNIFORM_VEC2);
 
-        SetShaderValue(m_lightingShader, m_locLightRadius, &m_lightRadius, SHADER_UNIFORM_FLOAT);
+        SetShaderValue(m_lightingShader, m_locLightRadius, &screenLightRadius, SHADER_UNIFORM_FLOAT);
 
         SetShaderValue(m_lightingShader, m_locLightColor, &m_lightColor, SHADER_UNIFORM_VEC3);
 
@@ -491,14 +600,26 @@ namespace Game
 
         const float playerFeetY = m_position.y + kPlayerBodyOffsetY;
 
+        m_camera.Begin();
+
         DrawLitTrees(playerFeetY, true);
-
         DrawPlayer();
-
         DrawLitTrees(playerFeetY, false);
-        DrawFPS(10, 10);
 
-    // DEBUG
-    m_world.DrawDebugGrid();
+        if (m_showFlowField)
+        {
+            m_world.DrawDebugGrid();
+            m_world.DrawFlowField(
+                m_camera.GetWorldTopLeft(),
+                m_camera.GetWorldBottomRight()
+            );
+        }
+
+        if (m_showColliders)
+            m_physicsWorld.DrawDebugColliders();
+
+        m_camera.End();
+
+        DrawFPS(10, 10);
     }
 }

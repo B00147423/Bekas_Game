@@ -2,7 +2,6 @@
 
 #include <raylib.h>
 #include <random>
-
 #include <box2d/box2d.h>
 
 #include "../Animation/Animation.h"
@@ -11,6 +10,9 @@
 #include "../World/Tileset.h"
 #include "../Lighting/OcclusionBuffer.h"
 #include "../Lighting/ShadowBuffer.h"
+#include "../Physics/PhysicsWorld.h"
+#include "Camera.h"
+
 namespace Game
 {
     class Game
@@ -38,11 +40,17 @@ namespace Game
         void RenderBlur();
         void DrawLitTrees(float playerFeetY, bool behindPlayer);
 
-        World::World m_world;
+        // World-space light origin (player feet). Shaders get screen-space copies.
+        Vector2 GetLightWorldPosition() const;
+
         World::Tileset m_tileset;
 
         Animation::Animation m_idleAnimation;
         Animation::Animation m_runAnimation;
+
+        Physics::PhysicsWorld m_physicsWorld;
+        World::World m_world;
+        Camera m_camera;
 
         Texture2D m_idleTexture{};
         Texture2D m_runTexture{};
@@ -77,12 +85,18 @@ namespace Game
 
         Vector3 m_lightColor = { 1.0f, 0.95f, 0.85f };
         bool m_playerMoving = false;
-        float m_lightRadius = 200.0f;
+        float m_lightRadius = 500.0f;
         float m_lightIntensity = 1.5f;
         float m_ambient = 0.08f;
 
         b2BodyId m_playerBody{};
+
         Vector2 m_position{};
         float m_playerSpeed = 150.0f;
+        bool m_showColliders = false;
+        bool m_showFlowField = false;
+
+
+        bool m_fullBright = false;
     };
 }
