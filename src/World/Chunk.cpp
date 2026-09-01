@@ -4,10 +4,8 @@ namespace World
 {
     Chunk::Chunk()
     {
-        for (int x = 0; x < CHUNK_WIDTH; x++)
-        {
-            for (int y = 0; y < CHUNK_HEIGHT; y++)
-            {
+        for (int x = 0; x < CHUNK_WIDTH; x++){
+            for (int y = 0; y < CHUNK_HEIGHT; y++){
                 m_tiles[x][y] = Tile{};
             }
         }

@@ -4,7 +4,6 @@
 
 namespace World
 {
-
     enum TileType
     {
         Air,
@@ -17,9 +16,17 @@ namespace World
         IronOre,
     };
 
+    enum BiomeType
+    {
+        Plains,
+        Forest,
+    };
+
     struct Tile
     {
         TileType type = TileType::Air;
+        BiomeType biome = BiomeType::Plains;
+
         bool solid = false;
         uint8_t metadata = 0;
     };

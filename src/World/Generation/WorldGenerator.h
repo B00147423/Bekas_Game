@@ -13,6 +13,7 @@ namespace World::Generation
         WorldGenerator(uint64_t seed);
 
         void GenerateChunk(Chunk& chunk);
+        bool IsForestAt(float tileX, float tileY);
 
     private:
         // Kept for later (hills / side-view). Not used by top-down GenerateChunk yet.
