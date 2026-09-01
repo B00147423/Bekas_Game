@@ -1,29 +1,22 @@
 #include "World.h"
 
+#include <cmath>
+
 namespace World
 {
-    World::World(uint64_t seed)
-        : m_seed(seed),
+    World::World(uint64_t seed, Physics::PhysicsWorld& physicsWorld)
+        : m_physicsWorld(physicsWorld),
+        m_seed(seed),
         m_worldGenerator(seed)
     {
-        b2WorldDef worldDef = b2DefaultWorldDef();
-        worldDef.gravity = { 0.0f, 0.0f };
-        m_physicsWorld = b2CreateWorld(&worldDef);
     }
 
-    World::~World()
-    {
-        b2DestroyWorld(m_physicsWorld);
-    }
     void World::ClearSpawnArea(int centerTileX, int centerTileY, int radius)
     {
-        for (int y = centerTileY - radius; y <= centerTileY + radius; y++)
-        {
-            for (int x = centerTileX - radius; x <= centerTileX + radius; x++)
-            {
+        for (int y = centerTileY - radius; y <= centerTileY + radius; y++){
+            for (int x = centerTileX - radius; x <= centerTileX + radius; x++){
                 if (x < 0 || x >= Chunk::CHUNK_WIDTH ||
-                    y < 0 || y >= Chunk::CHUNK_HEIGHT)
-                {
+                    y < 0 || y >= Chunk::CHUNK_HEIGHT){
                     continue;
                 }
 
@@ -64,44 +57,17 @@ namespace World
         );
     }
 
-    void World::Step(float deltaTime)
-    {
-        b2World_Step(m_physicsWorld, deltaTime, 4);
-    }
 
-    void World::DrawGrassTile(
-        const Tileset& tileset,
-        int tileX,
-        int tileY,
-        uint8_t metadata,
-        const Rectangle& dest,
-        Color tint) const
-    {
-        const unsigned hash =
-            static_cast<unsigned>(tileX) * 374761393u ^
-            static_cast<unsigned>(tileY) * 668265263u ^
-            static_cast<unsigned>(metadata) * 1274126177u;
+    void World::DrawGrassTile(const Tileset& tileset, int tileX, int tileY, uint8_t metadata, const Rectangle& dest, Color tint) const{
+        unsigned hash = static_cast<unsigned>(tileX);
+        hash ^= static_cast<unsigned>(tileY) + 0x9e3779b9u + (hash << 6) + (hash >> 2);
 
+        hash ^= hash >> 16;
+        hash *= 0x7feb352du;
+        hash ^= hash >> 15;
+        hash *= 0x846ca68bu;
+        hash ^= hash >> 16;
         const Rectangle src = tileset.GetGrass(static_cast<int>(hash & 0x7fffffffu));
-
-        static constexpr Color kTints[] = {
-            Color{ 255, 255, 255, 255 },
-            Color{ 242, 255, 240, 255 },
-            Color{ 232, 250, 228, 255 },
-            Color{ 248, 255, 242, 255 },
-            Color{ 224, 245, 220, 255 },
-            Color{ 238, 252, 232, 255 },
-            Color{ 250, 255, 244, 255 },
-            Color{ 216, 240, 214, 255 },
-        };
-
-        const Color base = kTints[(hash >> 3) & 7u];
-        const Color finalTint = {
-            static_cast<unsigned char>((base.r * tint.r) / 255),
-            static_cast<unsigned char>((base.g * tint.g) / 255),
-            static_cast<unsigned char>((base.b * tint.b) / 255),
-            255
-        };
 
         DrawTexturePro(
             tileset.GetGrassTexture(),
@@ -109,49 +75,86 @@ namespace World
             dest,
             { 0.0f, 0.0f },
             0.0f,
-            finalTint
+            tint
         );
+
+        (void)metadata;
     }
 
     void World::CreateTreeColliders()
     {
-        constexpr float tileSize = 16.0f;
-        constexpr float pixelsPerMeter = 32.0f;
+        const float stumpSize = TreeStumpSize * TreeScale;
 
-        for (int y = 0; y < Chunk::CHUNK_HEIGHT; y++)
-        {
-            for (int x = 0; x < Chunk::CHUNK_WIDTH; x++)
-            {
+        for (int y = 0; y < Chunk::CHUNK_HEIGHT; y++) {
+            for (int x = 0; x < Chunk::CHUNK_WIDTH; x++){
                 if (m_chunk.GetTile(x, y).type != TileType::Tree)
                     continue;
-                const float stumpX =static_cast<float>(x) * tileSize +tileSize * 0.5f;
-                const float stumpY =static_cast<float>(y) * tileSize +12.0f;
 
-                b2BodyDef bodyDef = b2DefaultBodyDef();
-                bodyDef.type = b2_staticBody;
-                bodyDef.position = {
-                    stumpX / pixelsPerMeter,
-                    stumpY / pixelsPerMeter
-                };
+                // Stump at tree feet (bottom of tile), not the full canopy
+                const float stumpX = static_cast<float>(x) * TileSize + TileSize * 0.5f;
+                const float stumpY = static_cast<float>(y) * TileSize + TileSize - stumpSize * 0.5f;
 
-                const b2BodyId bodyId =         b2CreateBody(m_physicsWorld, &bodyDef);
-                const b2Polygon stumpShape =    b2MakeBox( 8.0f / pixelsPerMeter, 8.0f / pixelsPerMeter);
-                b2ShapeDef shapeDef =           b2DefaultShapeDef();
-
-                b2CreatePolygonShape(bodyId, &shapeDef,&stumpShape);
+                m_physicsWorld.CreateStaticBox({ stumpX, stumpY }, { stumpSize, stumpSize });
             }
         }
     }
 
+    bool World::isForest(int tileX, int tileY) const
+    {
+        if (tileX < 0 || tileX >= Chunk::CHUNK_WIDTH ||
+            tileY < 0 || tileY >= Chunk::CHUNK_HEIGHT)
+        {
+            return false;
+        }
+        return m_chunk.GetTile(tileX, tileY).biome== BiomeType::Forest;
+    }
+    
+
+    uint8_t World::GetForestMask(int tileX, int tileY) const
+    {
+        const bool north = isForest(tileX, tileY-1);
+        const bool east  = isForest(tileX+1, tileY);
+        const bool south = isForest(tileX, tileY+1);
+        const bool west = isForest(tileX-1, tileY);
+
+        uint8_t mask = 0;
+
+        if (north) mask |= 1;
+        if (east)  mask |= 4;
+        if (south) mask |= 16;
+        if (west)  mask |= 64;
+
+        if (north && east &&isForest(tileX + 1, tileY - 1))
+        {
+            mask |= 2;
+        }
+
+        
+        if (east && south &&isForest(tileX + 1, tileY + 1))
+        {
+            mask |= 8;
+        }
+
+        if (south && west &&isForest(tileX - 1, tileY + 1))
+        {
+            mask |= 32;
+        }
+
+        if (west && north &&isForest(tileX - 1, tileY - 1))
+        {
+        mask |= 128;
+        }
+        return mask;
+    }
+    
     void World::DrawGround(const Tileset& tileset) const
     {
         constexpr float tileSize = TileSize;
 
-        for (int x = 0; x < Chunk::CHUNK_WIDTH; x++)
-        {
-            for (int y = 0; y < Chunk::CHUNK_HEIGHT; y++)
-            {
+        for (int x = 0; x < Chunk::CHUNK_WIDTH; x++){
+            for (int y = 0; y < Chunk::CHUNK_HEIGHT; y++){
                 const Tile tile = m_chunk.GetTile(x, y);
+
                 if (tile.type == TileType::Air)
                     continue;
 
@@ -162,8 +165,120 @@ namespace World
                     tileSize
                 };
 
-                if (tile.type == TileType::Grass || tile.type == TileType::Tree)
-                    DrawGrassTile(tileset, x, y, tile.metadata, dest, WHITE);
+                const bool canDrawForest = tile.biome == BiomeType::Forest &&  tileset.GetForestTexture().id != 0;
+
+                if (canDrawForest){  
+                    const uint8_t mask = GetForestMask(x, y);
+
+                    DrawTexturePro(
+                        tileset.GetForestTexture(),
+                        tileset.GetForest(mask),
+                        dest,
+                        {0.0f, 0.0f},
+                        0.0f,
+                        WHITE
+                    );
+                }
+                else{
+                    DrawGrassTile(
+                        tileset,
+                        x,
+                        y,
+                        tile.metadata,
+                        dest,
+                        WHITE
+                    );
+                }
+            }
+        }
+    }
+
+
+    void World::DrawDebugGrid()  const{
+        for (int y = 0; y < Chunk::CHUNK_HEIGHT; ++y){
+            for (int x = 0; x < Chunk::CHUNK_WIDTH; ++x){
+                int cost = m_flowField.GetCost(x, y);
+
+                if (cost >= 0)
+                {
+                    DrawText(
+                        TextFormat("%d", cost),
+                        x * TileSize + 2,
+                        y * TileSize + 2,
+                        8,
+                        DARKBLUE
+                    );
+                }
+            }
+        }
+    }
+
+    // flow FIELD DEBUG DRAWING
+    void World::DrawFlowField(
+        Vector2 worldTopLeft,
+        Vector2 worldBottomRight) const
+    {
+        m_flowField.DrawFlowField(
+            TileSize,
+            worldTopLeft,
+            worldBottomRight
+        );
+    }
+
+    void World::DrawOccluders() const
+    {
+        for (int y = 0; y < Chunk::CHUNK_HEIGHT; ++y){
+            for (int x = 0; x < Chunk::CHUNK_WIDTH; ++x){
+                const Tile& tile = m_chunk.GetTile(x, y);
+
+                if (tile.type != TileType::Tree)
+                    continue;
+
+                DrawRectangle(
+                    x * TileSize,
+                    y * TileSize,
+                    TileSize,
+                    TileSize,
+                    WHITE
+                );
+            }
+        }
+    }
+
+    void World::DrawTrees(const Tileset& tileset, float playerFeetY, bool behindPlayer) const
+    {
+        constexpr float tileSize = TileSize;
+        const Rectangle pine = tileset.GetPineTree();
+
+        for (int y = 0; y < Chunk::CHUNK_HEIGHT; y++){
+            for (int x = 0; x < Chunk::CHUNK_WIDTH; x++){
+                const Tile tile = m_chunk.GetTile(x, y);
+                if (tile.type != TileType::Tree)
+                    continue;
+
+                const float treeFeetY = static_cast<float>(y) * tileSize + tileSize;
+                const bool isBehind = treeFeetY < playerFeetY;
+                if (isBehind != behindPlayer)
+                    continue;
+
+                const float treeWidth = pine.width * TreeScale;
+                const float treeHeight = pine.height * TreeScale;
+
+                const Rectangle dest = {
+                    static_cast<float>(x) * tileSize + (tileSize - treeWidth) * 0.5f,
+                    static_cast<float>(y) * tileSize + tileSize - treeHeight,
+                    treeWidth,
+                    treeHeight
+                };
+
+                DrawTexturePro(
+                    tileset.GetFoliageTexture(),
+                    pine,
+                    dest,
+                    { 0.0f, 0.0f },
+                    0.0f,
+                    WHITE
+                );
             }
         }
     }
@@ -174,7 +289,7 @@ namespace World
         const int targetY = static_cast<int>(worldPosition.y / TileSize);
 
         if (targetX < 0 || targetX >= Chunk::CHUNK_WIDTH ||
-            targetY < 0 || targetY >= Chunk::CHUNK_HEIGHT)
+            targetY < 0 || targetY >= Chunk::CHUNK_HEIGHT) 
         {
             return;
         }
@@ -202,80 +317,119 @@ namespace World
             return { 0.0f, 0.0f };
         }
 
-        return m_flowField.GetDirection(tileX, tileY);
-    }
+        Vector2 tileDir = m_flowField.GetDirection(tileX, tileY);
 
-    void World::DrawDebugGrid()  const{
-        for (int y = 0; y < Chunk::CHUNK_HEIGHT; ++y){
-            for (int x = 0; x < Chunk::CHUNK_WIDTH; ++x){
-                int cost = m_flowField.GetCost(x, y);
+        // Unreachable tile: step toward any cheaper neighbor
+        if (tileDir.x == 0.0f && tileDir.y == 0.0f &&
+            m_flowField.GetCost(tileX, tileY) < 0)
+        {
+            const int dirs[4][2] = {
+                { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }
+            };
 
-                if (cost >= 0)
+            int bestCost = 0x7fffffff;
+            for (const auto& d : dirs)
+            {
+                const int nx = tileX + d[0];
+                const int ny = tileY + d[1];
+                if (nx < 0 || nx >= Chunk::CHUNK_WIDTH ||
+                    ny < 0 || ny >= Chunk::CHUNK_HEIGHT)
                 {
-                    DrawText(
-                        TextFormat("%d", cost),
-                        x * TileSize + 2,
-                        y * TileSize + 2,
-                        8,
-                        DARKBLUE
-                    );
+                    continue;
+                }
+
+                const int cost = m_flowField.GetCost(nx, ny);
+                if (cost >= 0 && cost < bestCost)
+                {
+                    bestCost = cost;
+                    tileDir = {
+                        static_cast<float>(d[0]),
+                        static_cast<float>(d[1])
+                    };
                 }
             }
         }
+
+        if (tileDir.x == 0.0f && tileDir.y == 0.0f)
+            return { 0.0f, 0.0f };
+
+        // Steer toward the center of the next tile — reduces getting
+        // hung up on stump corners while only using cardinal tile steps.
+        const float nextCenterX =
+            (static_cast<float>(tileX) + tileDir.x) * TileSize + TileSize * 0.5f;
+        const float nextCenterY =
+            (static_cast<float>(tileY) + tileDir.y) * TileSize + TileSize * 0.5f;
+
+        Vector2 steer = {
+            nextCenterX - worldPosition.x,
+            nextCenterY - worldPosition.y
+        };
+
+        const float lenSq = steer.x * steer.x + steer.y * steer.y;
+        if (lenSq < 0.0001f)
+            return tileDir;
+
+        const float invLen = 1.0f / sqrtf(lenSq);
+        return { steer.x * invLen, steer.y * invLen };
     }
-    void World::DrawOccluders() const{
-        for (int y = 0; y < Chunk::CHUNK_HEIGHT; ++y){
-            for (int x = 0; x < Chunk::CHUNK_WIDTH; ++x)
-            {
-                const Tile& tile = m_chunk.GetTile(x, y);
 
-                if (tile.type != TileType::Tree)
-                    continue;
+    Vector2 World::GetSlideDirection(Vector2 worldPosition, Vector2 blockedDir) const
+    {
+        int tileX = static_cast<int>(worldPosition.x / TileSize);
+        int tileY = static_cast<int>(worldPosition.y / TileSize);
 
-                DrawRectangle(
-                    x * TileSize,
-                    y * TileSize,
-                    TileSize,
-                    TileSize,
-                    WHITE
-                );
-            }
-        }
-    }
-
-    void World::DrawTrees(const Tileset& tileset, float playerFeetY, bool behindPlayer) const{
-        constexpr float tileSize = TileSize;
-        const Rectangle pine = tileset.GetPineTree();
-
-        for (int y = 0; y < Chunk::CHUNK_HEIGHT; y++)
+        if (tileX < 0 || tileX >= Chunk::CHUNK_WIDTH ||
+            tileY < 0 || tileY >= Chunk::CHUNK_HEIGHT)
         {
-            for (int x = 0; x < Chunk::CHUNK_WIDTH; x++)
+            return { 0.0f, 0.0f };
+        }
+
+        // Prefer side steps that still go downhill on the cost field
+        const Vector2 candidates[4] = {
+            { -blockedDir.y, blockedDir.x },
+            { blockedDir.y, -blockedDir.x },
+            { -blockedDir.x, -blockedDir.y },
+            blockedDir
+        };
+
+        int bestCost = 0x7fffffff;
+        Vector2 best = { 0.0f, 0.0f };
+
+        for (const Vector2& c : candidates)
+        {
+            // Quantize to tile step
+            const int dx = (c.x > 0.3f) ? 1 : (c.x < -0.3f ? -1 : 0);
+            const int dy = (c.y > 0.3f) ? 1 : (c.y < -0.3f ? -1 : 0);
+            if (dx == 0 && dy == 0)
+                continue;
+
+            const int nx = tileX + dx;
+            const int ny = tileY + dy;
+            if (nx < 0 || nx >= Chunk::CHUNK_WIDTH ||
+                ny < 0 || ny >= Chunk::CHUNK_HEIGHT)
             {
-                const Tile tile = m_chunk.GetTile(x, y);
-                if (tile.type != TileType::Tree)
-                    continue;
+                continue;
+            }
 
-                const float treeFeetY = static_cast<float>(y) * tileSize + tileSize;
-                const bool isBehind = treeFeetY < playerFeetY;
-                if (isBehind != behindPlayer)
-                    continue;
-
-                const Rectangle dest = {
-                    static_cast<float>(x) * tileSize + (tileSize - pine.width) * 0.5f,
-                    static_cast<float>(y) * tileSize + tileSize - pine.height,
-                    pine.width,
-                    pine.height
+            const int cost = m_flowField.GetCost(nx, ny);
+            if (cost >= 0 && cost < bestCost)
+            {
+                bestCost = cost;
+                const float nextCenterX = static_cast<float>(nx) * TileSize + TileSize * 0.5f;
+                const float nextCenterY = static_cast<float>(ny) * TileSize + TileSize * 0.5f;
+                Vector2 steer = {
+                    nextCenterX - worldPosition.x,
+                    nextCenterY - worldPosition.y
                 };
-
-                DrawTexturePro(
-                    tileset.GetFoliageTexture(),
-                    pine,
-                    dest,
-                    { 0.0f, 0.0f },
-                    0.0f,
-                    WHITE
-                );
+                const float lenSq = steer.x * steer.x + steer.y * steer.y;
+                if (lenSq > 0.0001f)
+                {
+                    const float invLen = 1.0f / sqrtf(lenSq);
+                    best = { steer.x * invLen, steer.y * invLen };
+                }
             }
         }
+
+        return best;
     }
 }
