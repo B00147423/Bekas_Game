@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../UI/ScreenManager.h"
-#include "../UI/SettingsScreen.h"
-#include "../UI/MainMenuScreen.h"
-#include "../Game/Game.h"
+#include "UI/ScreenManager.h"
+#include "UI/SettingsScreen.h"
+#include "UI/MainMenuScreen.h"
+#include "Game/Game.h"
 
 #include <memory>
 

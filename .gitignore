@@ -6,5 +6,10 @@ build/
 
 # CMake
 CMakeUserPresets.json
-
+Game_Ideas/
 lighting_docs/
+IMPLEMENTATION_GUIDE/
+LIGHTING_PIPELINE_NOTES.md
+/graphics_settings.json
+amsk 46 tileset autotile.txt
+CHOP_TREE_GUIDE.txt

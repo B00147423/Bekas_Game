@@ -1,4 +1,5 @@
 #include "MainMenuScreen.h"
+#include <algorithm>
 
 namespace UI
 {
@@ -36,14 +37,7 @@ namespace UI
     void MainMenuScreen::Update()
     {
         Vector2 mouse = GetMousePosition();
-DrawText(
-    TextFormat("Mouse: %.0f, %.0f", mouse.x, mouse.y),
-    10, 10, 20, RED
-);
-
-            DrawRectangleLinesEx(playButton, 2, RED);
-            DrawRectangleLinesEx(settingsButton, 2, GREEN);
-            DrawRectangleLinesEx(quitButton, 2, BLUE);
+        Layout();
         if (CheckCollisionPointRec(mouse, playButton) &&
             IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
         {
@@ -59,13 +53,18 @@ DrawText(
         if (CheckCollisionPointRec(mouse, quitButton) &&
             IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
         {
-            CloseWindow();
+            quitRequested=true;
         }
     }
 
     bool MainMenuScreen::StartGameRequested() const
     {
         return startGame;
+    }
+
+    void MainMenuScreen::Layout() {
+        float y=std::max(180,GetScreenHeight()-220);
+        playButton={40,y,200,50};settingsButton={40,y+60,250,50};quitButton={40,y+120,150,50};
     }
 
     void MainMenuScreen::Draw()
@@ -76,11 +75,13 @@ DrawText(
         bool settingsHovered = CheckCollisionPointRec(mouse, settingsButton);
         bool quitHovered = CheckCollisionPointRec(mouse, quitButton);
 
-        DrawTexture(m_backgroundTexture, 0, 0, WHITE);
+        Layout();
+        DrawTexturePro(m_backgroundTexture,{0,0,(float)m_backgroundTexture.width,(float)m_backgroundTexture.height},
+            {0,0,(float)GetScreenWidth(),(float)GetScreenHeight()},{0,0},0,WHITE);
 
         DrawTextureEx(
             m_logoTexture,
-            {430.0f, 35.0f},
+            {(GetScreenWidth()-m_logoTexture.width)*0.5f, 35.0f},
             0.0f,
             1.0f,
             WHITE

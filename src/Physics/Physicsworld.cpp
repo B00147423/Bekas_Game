@@ -1,5 +1,7 @@
 #include "PhysicsWorld.h"
 
+#include <algorithm>
+
 namespace Physics
 {
     namespace
@@ -22,7 +24,19 @@ namespace Physics
 
     PhysicsWorld::~PhysicsWorld()
     {
-        b2DestroyWorld(m_world);
+        if (b2World_IsValid(m_world)) b2DestroyWorld(m_world);
+    }
+
+    void PhysicsWorld::DestroyBody(b2BodyId body)
+    {
+        std::erase_if(m_debugBoxes, [body](const DebugBox& box) {
+            return B2_ID_EQUALS(box.body, body);
+        });
+
+        if (!b2World_IsValid(m_world) || !b2Body_IsValid(body)) return;
+        if (b2StoreWorldId(b2Body_GetWorld(body)) != b2StoreWorldId(m_world)) return;
+
+        b2DestroyBody(body);
     }
 
     void PhysicsWorld::Step(float deltaTime)

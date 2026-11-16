@@ -12,6 +12,7 @@ namespace UI
         void ChangeScreen(Screen* screen);
         void Update();
         void Draw();
+        Screen* Current() const { return currentScreen; }
 
     private:
         Screen* currentScreen;

@@ -11,9 +11,9 @@ layout(location = 1) out vec4 outNormal;
 
 void main()
 {
-    vec4 color = texture(texture0, fragTexCoord) * colDiffuse * fragColor;
+    vec4 surfaceColor = texture(texture0, fragTexCoord) * colDiffuse * fragColor;
 
-    outAlbedo = color;
+    outAlbedo = surfaceColor;
 
     // Flat 2D surface pointing toward the camera
     outNormal = vec4(0.5, 0.5, 1.0, 1.0);

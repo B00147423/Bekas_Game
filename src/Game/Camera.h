@@ -10,6 +10,7 @@ namespace Game
         Camera();
 
         void Update();
+        void RefreshViewport();
 
         void SetTarget(Vector2 target);
 
@@ -28,11 +29,16 @@ namespace Game
 
     private:
         Camera2D m_camera{};
+        int m_viewportWidth = 0;
+        int m_viewportHeight = 0;
 
         float m_moveSpeed = 500.0f;
         float m_zoomSpeed = 0.1f;
 
-        float m_minZoom = 0.5f;
-        float m_maxZoom = 3.0f;
+        float defaultZoom = 1.0f;
+        float m_minZoom = 0.75f;
+        float m_maxZoom = 2.0f;
+
+        
     };
 }

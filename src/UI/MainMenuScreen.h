@@ -18,6 +18,7 @@ namespace UI
 
 
         bool StartGameRequested() const;
+        bool QuitRequested() const { return quitRequested; }
 
     private:
         ScreenManager* screenManager;
@@ -38,5 +39,7 @@ namespace UI
 
         const float spacing = 60.0f;
         bool startGame = false;
+        bool quitRequested = false;
+        void Layout();
     };
 }

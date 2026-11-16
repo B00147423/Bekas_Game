@@ -1,4 +1,5 @@
 #include "Camera.h"
+#include "GameConfig.h"
 
 #include <algorithm>
 #include <cmath>
@@ -13,15 +14,34 @@ namespace Game
             static_cast<float>(GetScreenHeight()) * 0.5f
         };
         m_camera.rotation = 0.0f;
-        m_camera.zoom = 1.0f;
+        m_camera.zoom = defaultZoom;
     }
+
+        void Camera::RefreshViewport() {
+            const int width = GetScreenWidth();
+            const int height = GetScreenHeight();
+
+            if (width <= 0 || height <= 0)
+                return;
+
+            m_camera.offset = {width * 0.5f, height * 0.5f};
+
+            if (width == m_viewportWidth && height == m_viewportHeight)
+                return;
+
+            m_viewportWidth = width;
+            m_viewportHeight = height;
+
+            const float worldWidth = GameConfig::World::ChunkWidth * GameConfig::World::TileSize;
+            const float worldHeight = GameConfig::World::ChunkHeight * GameConfig::World::TileSize;
+
+            m_camera.target = {worldWidth * 0.5f, worldHeight * 0.5f};
+            m_camera.zoom = std::clamp(defaultZoom, m_minZoom, m_maxZoom);
+        }
 
     void Camera::Update()
     {
-        m_camera.offset = {
-            static_cast<float>(GetScreenWidth()) * 0.5f,
-            static_cast<float>(GetScreenHeight()) * 0.5f
-        };
+        RefreshViewport();
 
         // Middle-mouse drag pans the world under the cursor
         if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE))
@@ -59,6 +79,16 @@ namespace Game
             m_camera.zoom += wheel * m_zoomSpeed;
             m_camera.zoom = std::clamp(m_camera.zoom, m_minZoom, m_maxZoom);
         }
+
+        // Keep panning and zooming from exposing empty space outside the map.
+        const float halfWidth = GetScreenWidth() * 0.5f / m_camera.zoom;
+        const float halfHeight = GetScreenHeight() * 0.5f / m_camera.zoom;
+        const float worldWidth = GameConfig::World::ChunkWidth * GameConfig::World::TileSize;
+        const float worldHeight = GameConfig::World::ChunkHeight * GameConfig::World::TileSize;
+        m_camera.target.x = halfWidth >= worldWidth * 0.5f ? worldWidth * 0.5f
+            : std::clamp(m_camera.target.x, halfWidth, worldWidth - halfWidth);
+        m_camera.target.y = halfHeight >= worldHeight * 0.5f ? worldHeight * 0.5f
+            : std::clamp(m_camera.target.y, halfHeight, worldHeight - halfHeight);
     }
 
     void Camera::SetTarget(Vector2 target)

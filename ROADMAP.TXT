@@ -1,0 +1,70 @@
+1. GAME IDEA
+   ↓
+   - Genre: Top-down survival builder
+   - Core loop: Explore → gather resources → place tiles/structures → expand base
+   - Player actions: WASD move, break/gather tiles, place from inventory
+   - Goal (MVP): Survive and build a small base
+   - Lose condition: (later — hunger/enemies; none for first playable)
+
+2. GAME REQUIREMENTS
+   ↓
+   MVP systems:
+   - Camera (follow player)
+   - Tile / chunk world
+   - Player movement + collision
+   - Break / gather tiles → inventory
+   - Place tiles from inventory
+   - Simple resource world gen (surface only)
+   - Hotbar / basic UI
+
+   Later:
+   - Crafting
+   - Enemies / night cycle
+   - Save / load
+   - More biomes / structures
+   - Hunger / health
+
+3. FIRST PLAYABLE (MVP)
+   ↓
+   - One player, top-down WASD
+   - One flat-ish map with grass, dirt, stone, trees
+   - Left click break nearby tile → add to inventory
+   - Right click / hotbar place tile if you have it
+   - Camera follows player
+   - No caves, ores, biomes, or combat yet
+
+4. IMPLEMENT CORE GAMEPLAY
+   ↓
+   - Player spawn
+   - Movement + tile collision
+   - Break / gather
+   - Inventory + hotbar select
+   - Place tiles
+   - Simple world gen
+
+5. GAME FLOW
+   ↓
+   Menu → Playing → Pause → (later Game Over) → Restart
+
+6. EXPAND
+   ↓
+   - Crafting
+   - More resources / building pieces
+   - Enemies
+   - Day / night
+   - Progression / tools
+
+7. PRESENTATION
+   ↓
+   - Better tiles / sprites
+   - Animations
+   - Sound / music
+   - UI polish
+
+8. FINISHING
+   ↓
+   - Save / load
+   - Settings
+   - Tutorial
+   - Bug fix / balance
+   - Build & release

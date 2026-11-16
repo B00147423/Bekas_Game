@@ -14,19 +14,25 @@ add_executable(BEKAS_GAME
     src/UI/GameOverScreen.cpp
     src/Animation/Animation.cpp
     src/Game/Game.cpp
+    src/Game/Player/Player.cpp
+    src/World/WaterRenderer.cpp
     src/World/World.cpp
-    src/World/Generation/WorldGenerator.cpp
-    src/World/Generation/HeightMapGenerator.cpp
-    src/World/Generation/TerrainGenerator.cpp
+    src/World/WorldRendering.cpp
+    src/World/WorldShadows.cpp
+    src/World/WorldNavigation.cpp
+    src/World/WorldPhysics.cpp
+    src/World/WorldFog.cpp
+    src/Generation/WorldGenerator.cpp
     src/World/Chunk.cpp
-    src/World/Generation/NoiseGenerator.cpp
-    src/World/Tileset.cpp
+    src/Generation/NoiseGenerator.cpp
+    src/Rendering/Tileset.cpp
+    src/Lighting/LightingSystem.cpp
     src/Lighting/GBuffer.cpp
-    src/Lighting/OcclusionBuffer.cpp
     src/Lighting/ShadowBuffer.cpp
-    src/World/FlowField.cpp
+    src/Navigation/FlowField.cpp
     src/Physics/Physicsworld.cpp
     src/Game/Camera.cpp
+    src/Lighting/ShadowRenderer2D.cpp
 )
 
 target_include_directories(BEKAS_GAME PRIVATE

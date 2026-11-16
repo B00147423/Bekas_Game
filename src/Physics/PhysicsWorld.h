@@ -29,6 +29,10 @@ namespace Physics
             Vector2 size
         );
 
+        // Ignores invalid IDs and bodies belonging to another simulation.
+        // Call outside Step(), while the simulation is not locked.
+        void DestroyBody(b2BodyId body);
+
         Vector2 GetBodyPosition(b2BodyId body) const;
 
         void SetVelocity(

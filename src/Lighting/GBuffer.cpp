@@ -9,13 +9,18 @@ namespace Lighting
 
     void GBuffer::Init(int width, int height)
     {
+        if(width<=0 || height<=0 || (width==m_width && height==m_height)) return;
+        // Retain the compiled shader across resize; only attachment storage changes.
+        Shader shader=m_shader;
+        m_shader={};
         Unload();
+        m_shader=shader;
 
         m_width = width;
         m_height = height;
 
         // Default vertex shader + custom MRT fragment shader
-        m_shader = LoadShader(nullptr, "src/shaders/gbuffer.fs");
+        if(!m_shader.id) m_shader = LoadShader(nullptr, "src/shaders/gbuffer.fs");
         if (!IsShaderValid(m_shader))
             TraceLog(LOG_WARNING, "GBuffer: Failed to load gbuffer.fs");
 
@@ -58,7 +63,7 @@ namespace Lighting
         // Match BeginTextureMode / 2D screen space (top-left origin)
         rlMatrixMode(RL_PROJECTION);
         rlLoadIdentity();
-        rlOrtho(0.0, static_cast<double>(m_width), static_cast<double>(m_height), 0.0, 0.0, 1.0);
+        rlOrtho(0.0, static_cast<double>(GetScreenWidth()), static_cast<double>(GetScreenHeight()), 0.0, 0.0, 1.0);
 
         rlMatrixMode(RL_MODELVIEW);
         rlLoadIdentity();
@@ -90,7 +95,7 @@ namespace Lighting
 
         rlMatrixMode(RL_PROJECTION);
         rlLoadIdentity();
-        rlOrtho(0.0, static_cast<double>(renderWidth), static_cast<double>(renderHeight), 0.0, 0.0, 1.0);
+        rlOrtho(0.0, static_cast<double>(GetScreenWidth()), static_cast<double>(GetScreenHeight()), 0.0, 0.0, 1.0);
 
         rlMatrixMode(RL_MODELVIEW);
         rlLoadIdentity();

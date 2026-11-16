@@ -10,23 +10,23 @@ out vec4 finalColor;
 
 void main()
 {
-    vec2 texelSize = 1.0 / resolution;
+    vec2 texturePixelSize = 1.0 / resolution;
 
-    vec2 offset = direction * texelSize;
+    vec2 sampleOffset = direction * texturePixelSize;
 
-    float result = 0.0;
+    float blurredVisibility = 0.0;
 
-    result += texture(texture0, fragTexCoord - offset * 4.0).r * 0.05;
-    result += texture(texture0, fragTexCoord - offset * 3.0).r * 0.09;
-    result += texture(texture0, fragTexCoord - offset * 2.0).r * 0.12;
-    result += texture(texture0, fragTexCoord - offset).r       * 0.15;
+    blurredVisibility += texture(texture0, fragTexCoord - sampleOffset * 4.0).r * 0.05;
+    blurredVisibility += texture(texture0, fragTexCoord - sampleOffset * 3.0).r * 0.09;
+    blurredVisibility += texture(texture0, fragTexCoord - sampleOffset * 2.0).r * 0.12;
+    blurredVisibility += texture(texture0, fragTexCoord - sampleOffset).r       * 0.15;
 
-    result += texture(texture0, fragTexCoord).r                * 0.18;
+    blurredVisibility += texture(texture0, fragTexCoord).r                * 0.18;
 
-    result += texture(texture0, fragTexCoord + offset).r       * 0.15;
-    result += texture(texture0, fragTexCoord + offset * 2.0).r * 0.12;
-    result += texture(texture0, fragTexCoord + offset * 3.0).r * 0.09;
-    result += texture(texture0, fragTexCoord + offset * 4.0).r * 0.05;
+    blurredVisibility += texture(texture0, fragTexCoord + sampleOffset).r       * 0.15;
+    blurredVisibility += texture(texture0, fragTexCoord + sampleOffset * 2.0).r * 0.12;
+    blurredVisibility += texture(texture0, fragTexCoord + sampleOffset * 3.0).r * 0.09;
+    blurredVisibility += texture(texture0, fragTexCoord + sampleOffset * 4.0).r * 0.05;
 
-    finalColor = vec4(result, result, result, 1.0);
+    finalColor = vec4(blurredVisibility, blurredVisibility, blurredVisibility, 1.0);
 }
